@@ -1,181 +1,203 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>YFL Robotics Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; }
-  header { background: #161b22; padding: 16px 24px; border-bottom: 1px solid #30363d;
-           display: flex; align-items: center; gap: 12px; }
-  header h1 { font-size: 1.3rem; font-weight: 600; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: #3fb950; animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 16px; padding: 24px; }
-  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; }
-  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .card-title { font-size: 1rem; font-weight: 600; }
-  .badge { padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
-  .badge-RUNNING  { background: #1a4a2e; color: #3fb950; }
-  .badge-IDLE     { background: #1c2a3a; color: #58a6ff; }
-  .badge-ERROR    { background: #4a1a1a; color: #f85149; }
-  .badge-OFFLINE  { background: #2a2a2a; color: #8b949e; }
-  .badge-CHARGING { background: #3a2e0a; color: #d29922; }
-  .metric { display: flex; justify-content: space-between; padding: 4px 0;
-            border-bottom: 1px solid #21262d; font-size: 0.85rem; }
-  .metric:last-child { border-bottom: none; }
-  .metric-val { color: #58a6ff; font-weight: 500; }
-  .battery-bar { height: 6px; background: #21262d; border-radius: 3px; margin: 8px 0; }
-  .battery-fill { height: 100%; border-radius: 3px; transition: width .5s; }
-  .chart-wrap { padding: 0 24px 24px; }
-  .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; }
-  .chart-card h2 { font-size: 1rem; margin-bottom: 12px; color: #8b949e; }
-  .log-wrap { padding: 0 24px 24px; }
-  .log-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; }
-  .log-card h2 { font-size: 1rem; padding: 12px 16px; border-bottom: 1px solid #30363d; color: #8b949e; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-  th { background: #0d1117; padding: 8px 12px; text-align: left; color: #8b949e; }
-  td { padding: 6px 12px; border-top: 1px solid #21262d; }
-  #conn-status { font-size: 0.78rem; color: #8b949e; margin-left: auto; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e0e0e0; }
+  header { background: #1a1d27; border-bottom: 2px solid #2a2d3e; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.4rem; font-weight: 700; color: #7eb8f7; }
+  #ws-status { margin-left: auto; font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; background: #2a2d3e; }
+  #ws-status.connected { background: #1a3a2a; color: #4caf50; }
+  #ws-status.disconnected { background: #3a1a1a; color: #ef5350; }
+  main { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; color: #7eb8f7; margin: 20px 0 12px; }
+  .device-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .device-card { background: #1a1d27; border: 1px solid #2a2d3e; border-radius: 10px; padding: 16px; transition: border-color 0.2s; }
+  .device-card:hover { border-color: #4a6fa5; }
+  .device-card .name { font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
+  .device-card .type { font-size: 0.75rem; color: #888; margin-bottom: 10px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; }
+  .badge.RUNNING  { background: #1b3d24; color: #4caf50; }
+  .badge.IDLE     { background: #1e2a3a; color: #7eb8f7; }
+  .badge.ERROR    { background: #3d1b1b; color: #ef5350; }
+  .badge.OFFLINE  { background: #2a2a2a; color: #888; }
+  .badge.CHARGING { background: #2e2a10; color: #ffca28; }
+  .device-card .battery { margin-top: 10px; font-size: 0.82rem; color: #aaa; }
+  .battery-bar { height: 6px; background: #2a2d3e; border-radius: 3px; margin-top: 4px; }
+  .battery-fill { height: 100%; border-radius: 3px; background: #4caf50; transition: width 0.4s; }
+  .battery-fill.low  { background: #ef5350; }
+  .battery-fill.mid  { background: #ffca28; }
+  .chart-container { background: #1a1d27; border: 1px solid #2a2d3e; border-radius: 10px; padding: 16px; }
+  .events-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .events-table th { background: #1a1d27; color: #7eb8f7; text-align: left; padding: 8px 10px; border-bottom: 1px solid #2a2d3e; }
+  .events-table td { padding: 6px 10px; border-bottom: 1px solid #1a1d27; }
+  .events-table tr:nth-child(even) td { background: #13151f; }
+  .events-wrapper { background: #1a1d27; border: 1px solid #2a2d3e; border-radius: 10px; overflow: hidden; max-height: 320px; overflow-y: auto; }
 </style>
 </head>
 <body>
 <header>
-  <div class="dot" id="ws-dot" style="background:#f85149"></div>
-  <h1>YFL Robotics Mission Dashboard</h1>
-  <span id="conn-status">Connecting...</span>
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7eb8f7" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+  <h1>YFL Robotics Unified Dashboard</h1>
+  <span id="ws-status" class="disconnected">● Disconnected</span>
 </header>
+<main>
+  <h2>Device Status</h2>
+  <div class="device-grid" id="device-grid"></div>
 
-<div class="grid" id="device-grid"></div>
-
-<div class="chart-wrap">
-  <div class="chart-card">
-    <h2>Battery Levels (%)</h2>
-    <canvas id="battery-chart" height="80"></canvas>
+  <h2>Battery Levels (Live)</h2>
+  <div class="chart-container">
+    <canvas id="battery-chart" height="90"></canvas>
   </div>
-</div>
 
-<div class="log-wrap">
-  <div class="log-card">
-    <h2>Recent Telemetry Events</h2>
-    <table>
-      <thead><tr><th>Time</th><th>Device</th><th>Status</th><th>Battery</th><th>Type</th></tr></thead>
-      <tbody id="log-body"></tbody>
+  <h2>Recent Telemetry Events</h2>
+  <div class="events-wrapper">
+    <table class="events-table">
+      <thead><tr><th>Time</th><th>Device</th><th>Type</th><th>Status</th><th>Battery</th></tr></thead>
+      <tbody id="events-body"></tbody>
     </table>
   </div>
-</div>
+</main>
 
 <script>
-const DEVICES = ["GT3-001","Z908-001","Go2-001","ARM-001","CNC-001","SUB-001"];
-const COLORS = ["#58a6ff","#3fb950","#d29922","#f78166","#bc8cff","#39d3f2"];
+const DEVICE_IDS = ["GT3-001","Z908-001","Go2-001","ARM-001","CNC-001","SUB-001"];
+const DEVICE_TYPES = {"GT3":"GT3 Drone","Z908":"Z908 FPV","Go2":"Unitree Go2","RobotArm":"Robot Arm","CNC":"CNC Machine","Submarine":"Lego Submarine"};
+const MAX_EVENTS = 50;
+const MAX_CHART_POINTS = 30;
+
+const batteryHistory = {};
+DEVICE_IDS.forEach(id => { batteryHistory[id] = []; });
+
+const COLORS = ["#7eb8f7","#4caf50","#ffca28","#ef5350","#ab47bc","#26c6da"];
 
 const chart = new Chart(document.getElementById("battery-chart"), {
   type: "line",
   data: {
     labels: [],
-    datasets: DEVICES.map((d,i) => ({
-      label: d, data: [], borderColor: COLORS[i],
-      backgroundColor: COLORS[i]+"22", tension: 0.3, pointRadius: 2
+    datasets: DEVICE_IDS.map((id, i) => ({
+      label: id,
+      data: [],
+      borderColor: COLORS[i],
+      backgroundColor: COLORS[i] + "22",
+      tension: 0.4,
+      pointRadius: 2,
+      fill: false,
     }))
   },
   options: {
     animation: false,
     scales: {
-      y: { min: 0, max: 100, grid:{ color:"#21262d" }, ticks:{ color:"#8b949e" } },
-      x: { grid:{ color:"#21262d" }, ticks:{ color:"#8b949e", maxTicksLimit: 10 } }
+      y: { min: 0, max: 100, grid: { color: "#2a2d3e" }, ticks: { color: "#888" } },
+      x: { grid: { color: "#2a2d3e" }, ticks: { color: "#888", maxTicksLimit: 10 } }
     },
-    plugins: { legend:{ labels:{ color:"#e6edf3", boxWidth:12 } } }
+    plugins: { legend: { labels: { color: "#aaa", boxWidth: 12 } } }
   }
 });
 
-function batteryColor(v) {
-  if (v == null) return "#8b949e";
-  if (v > 50) return "#3fb950";
-  if (v > 20) return "#d29922";
-  return "#f85149";
+function buildCards() {
+  const grid = document.getElementById("device-grid");
+  DEVICE_IDS.forEach(id => {
+    const el = document.createElement("div");
+    el.className = "device-card";
+    el.id = "card-" + id;
+    el.innerHTML = `
+      <div class="name">${id}</div>
+      <div class="type" id="type-${id}">—</div>
+      <span class="badge OFFLINE" id="badge-${id}">OFFLINE</span>
+      <div class="battery">Battery: <span id="bat-${id}">—</span>%
+        <div class="battery-bar"><div class="battery-fill" id="batbar-${id}" style="width:0%"></div></div>
+      </div>`;
+    grid.appendChild(el);
+  });
 }
 
-const state = {};
-const logRows = [];
-
-function renderCards() {
-  const grid = document.getElementById("device-grid");
-  grid.innerHTML = "";
-  for (const [id, d] of Object.entries(state)) {
-    const batt = d.battery != null ? d.battery.toFixed(0) : null;
-    const bc = batteryColor(d.battery);
-    const status = d.status || "OFFLINE";
-    const extra = d.extra || {};
-    let rows = "";
-    if (batt != null) {
-      rows += `<div class="metric"><span>Battery</span><span class="metric-val" style="color:${bc}">${batt}%</span></div>
-               <div class="battery-bar"><div class="battery-fill" style="width:${batt}%;background:${bc}"></div></div>`;
-    }
-    if (extra.speed !== undefined) rows += `<div class="metric"><span>Speed</span><span class="metric-val">${extra.speed} m/s</span></div>`;
-    if (extra.rssi !== undefined) rows += `<div class="metric"><span>RSSI</span><span class="metric-val">${extra.rssi} dBm</span></div>`;
-    if (extra.depth !== undefined) rows += `<div class="metric"><span>Depth</span><span class="metric-val">${extra.depth} m</span></div>`;
-    if (extra.spindle_rpm !== undefined) rows += `<div class="metric"><span>Spindle RPM</span><span class="metric-val">${extra.spindle_rpm}</span></div>`;
-    if (extra.task_state !== undefined) rows += `<div class="metric"><span>Task</span><span class="metric-val">${extra.task_state}</span></div>`;
-    if (extra.leak_detected) rows += `<div class="metric"><span>LEAK</span><span class="metric-val" style="color:#f85149">DETECTED</span></div>`;
-    const imu = d.imu;
-    if (imu) rows += `<div class="metric"><span>Roll/Pitch</span><span class="metric-val">${(imu.roll||0).toFixed(1)}° / ${(imu.pitch||0).toFixed(1)}°</span></div>`;
-    rows += `<div class="metric"><span style="color:#8b949e;font-size:.75rem">${new Date((d.timestamp||0)*1000).toLocaleTimeString()}</span></div>`;
-    grid.innerHTML += `<div class="card">
-      <div class="card-header">
-        <span class="card-title">${id}</span>
-        <span class="badge badge-${status}">${status}</span>
-      </div>${rows}</div>`;
+function updateCard(pkt) {
+  const id = pkt.device;
+  const badge = document.getElementById("badge-" + id);
+  const batTxt = document.getElementById("bat-" + id);
+  const batBar = document.getElementById("batbar-" + id);
+  const typeEl = document.getElementById("type-" + id);
+  if (!badge) return;
+  badge.textContent = pkt.status;
+  badge.className = "badge " + pkt.status;
+  typeEl.textContent = DEVICE_TYPES[pkt.device_type] || pkt.device_type;
+  if (pkt.battery != null) {
+    batTxt.textContent = pkt.battery.toFixed(1);
+    const pct = Math.max(0, Math.min(100, pkt.battery));
+    batBar.style.width = pct + "%";
+    batBar.className = "battery-fill" + (pct < 20 ? " low" : pct < 50 ? " mid" : "");
   }
 }
 
-function updateChart(ts) {
-  const label = new Date(ts*1000).toLocaleTimeString();
-  chart.data.labels.push(label);
-  if (chart.data.labels.length > 30) chart.data.labels.shift();
-  DEVICES.forEach((d,i) => {
-    const v = state[d]?.battery ?? null;
-    chart.data.datasets[i].data.push(v);
-    if (chart.data.datasets[i].data.length > 30) chart.data.datasets[i].data.shift();
-  });
+function updateChart(pkt) {
+  const idx = DEVICE_IDS.indexOf(pkt.device);
+  if (idx === -1 || pkt.battery == null) return;
+  chart.data.datasets[idx].data.push(pkt.battery);
+  if (chart.data.datasets[idx].data.length > MAX_CHART_POINTS)
+    chart.data.datasets[idx].data.shift();
+  if (idx === 0) {
+    const t = new Date(pkt.timestamp * 1000);
+    chart.data.labels.push(t.toLocaleTimeString());
+    if (chart.data.labels.length > MAX_CHART_POINTS) chart.data.labels.shift();
+  }
   chart.update();
 }
 
-function addLog(pkt) {
-  const tr = `<tr>
-    <td>${new Date((pkt.timestamp||0)*1000).toLocaleTimeString()}</td>
-    <td>${pkt.device}</td>
-    <td><span class="badge badge-${pkt.status}">${pkt.status}</span></td>
-    <td>${pkt.battery != null ? pkt.battery.toFixed(0)+"%" : "—"}</td>
-    <td style="color:#8b949e">${pkt.device_type}</td>
-  </tr>`;
-  logRows.unshift(tr);
-  if (logRows.length > 50) logRows.pop();
-  document.getElementById("log-body").innerHTML = logRows.join("");
+function addEvent(pkt) {
+  const tbody = document.getElementById("events-body");
+  const tr = document.createElement("tr");
+  const t = new Date(pkt.timestamp * 1000).toLocaleTimeString();
+  tr.innerHTML = `<td>${t}</td><td>${pkt.device}</td><td>${pkt.device_type}</td>
+    <td><span class="badge ${pkt.status}">${pkt.status}</span></td>
+    <td>${pkt.battery != null ? pkt.battery.toFixed(1) + "%" : "—"}</td>`;
+  tbody.prepend(tr);
+  while (tbody.rows.length > MAX_EVENTS) tbody.deleteRow(tbody.rows.length - 1);
 }
 
-function connect() {
-  const ws = new WebSocket(`ws://${location.host}/ws/telemetry`);
+function connectWS() {
+  const wsEl = document.getElementById("ws-status");
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/ws/telemetry`);
+
   ws.onopen = () => {
-    document.getElementById("ws-dot").style.background = "#3fb950";
-    document.getElementById("conn-status").textContent = "Connected";
+    wsEl.textContent = "● Connected";
+    wsEl.className = "connected";
   };
   ws.onclose = () => {
-    document.getElementById("ws-dot").style.background = "#f85149";
-    document.getElementById("conn-status").textContent = "Reconnecting...";
-    setTimeout(connect, 3000);
+    wsEl.textContent = "● Disconnected";
+    wsEl.className = "disconnected";
+    setTimeout(connectWS, 3000);
   };
-  ws.onmessage = (e) => {
-    const pkt = JSON.parse(e.data);
-    state[pkt.device] = pkt;
-    renderCards();
-    updateChart(pkt.timestamp);
-    addLog(pkt);
+  ws.onerror = () => ws.close();
+  ws.onmessage = (ev) => {
+    try {
+      const pkt = JSON.parse(ev.data);
+      updateCard(pkt);
+      updateChart(pkt);
+      addEvent(pkt);
+    } catch (e) { /* ignore malformed */ }
   };
 }
-connect();
+
+buildCards();
+fetch("/api/devices").then(r => r.json()).then(data => {
+  Object.values(data).forEach(dev => {
+    if (dev.latest) {
+      updateCard({
+        device: dev.device_id,
+        device_type: dev.device_type,
+        battery: dev.latest.battery,
+        status: dev.latest.status,
+        timestamp: dev.latest.timestamp,
+      });
+    }
+  });
+});
+connectWS();
 </script>
 </body>
 </html>
