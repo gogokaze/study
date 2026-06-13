@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YFL Robotics Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; }
+  header { background: #161b22; padding: 16px 24px; border-bottom: 1px solid #30363d;
+           display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.3rem; font-weight: 600; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #3fb950; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 16px; padding: 24px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .card-title { font-size: 1rem; font-weight: 600; }
+  .badge { padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
+  .badge-RUNNING  { background: #1a4a2e; color: #3fb950; }
+  .badge-IDLE     { background: #1c2a3a; color: #58a6ff; }
+  .badge-ERROR    { background: #4a1a1a; color: #f85149; }
+  .badge-OFFLINE  { background: #2a2a2a; color: #8b949e; }
+  .badge-CHARGING { background: #3a2e0a; color: #d29922; }
+  .metric { display: flex; justify-content: space-between; padding: 4px 0;
+            border-bottom: 1px solid #21262d; font-size: 0.85rem; }
+  .metric:last-child { border-bottom: none; }
+  .metric-val { color: #58a6ff; font-weight: 500; }
+  .battery-bar { height: 6px; background: #21262d; border-radius: 3px; margin: 8px 0; }
+  .battery-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+  .chart-wrap { padding: 0 24px 24px; }
+  .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; }
+  .chart-card h2 { font-size: 1rem; margin-bottom: 12px; color: #8b949e; }
+  .log-wrap { padding: 0 24px 24px; }
+  .log-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; }
+  .log-card h2 { font-size: 1rem; padding: 12px 16px; border-bottom: 1px solid #30363d; color: #8b949e; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { background: #0d1117; padding: 8px 12px; text-align: left; color: #8b949e; }
+  td { padding: 6px 12px; border-top: 1px solid #21262d; }
+  #conn-status { font-size: 0.78rem; color: #8b949e; margin-left: auto; }
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="ws-dot" style="background:#f85149"></div>
+  <h1>YFL Robotics Mission Dashboard</h1>
+  <span id="conn-status">Connecting...</span>
+</header>
+
+<div class="grid" id="device-grid"></div>
+
+<div class="chart-wrap">
+  <div class="chart-card">
+    <h2>Battery Levels (%)</h2>
+    <canvas id="battery-chart" height="80"></canvas>
+  </div>
+</div>
+
+<div class="log-wrap">
+  <div class="log-card">
+    <h2>Recent Telemetry Events</h2>
+    <table>
+      <thead><tr><th>Time</th><th>Device</th><th>Status</th><th>Battery</th><th>Type</th></tr></thead>
+      <tbody id="log-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const DEVICES = ["GT3-001","Z908-001","Go2-001","ARM-001","CNC-001","SUB-001"];
+const COLORS = ["#58a6ff","#3fb950","#d29922","#f78166","#bc8cff","#39d3f2"];
+
+const chart = new Chart(document.getElementById("battery-chart"), {
+  type: "line",
+  data: {
+    labels: [],
+    datasets: DEVICES.map((d,i) => ({
+      label: d, data: [], borderColor: COLORS[i],
+      backgroundColor: COLORS[i]+"22", tension: 0.3, pointRadius: 2
+    }))
+  },
+  options: {
+    animation: false,
+    scales: {
+      y: { min: 0, max: 100, grid:{ color:"#21262d" }, ticks:{ color:"#8b949e" } },
+      x: { grid:{ color:"#21262d" }, ticks:{ color:"#8b949e", maxTicksLimit: 10 } }
+    },
+    plugins: { legend:{ labels:{ color:"#e6edf3", boxWidth:12 } } }
+  }
+});
+
+function batteryColor(v) {
+  if (v == null) return "#8b949e";
+  if (v > 50) return "#3fb950";
+  if (v > 20) return "#d29922";
+  return "#f85149";
+}
+
+const state = {};
+const logRows = [];
+
+function renderCards() {
+  const grid = document.getElementById("device-grid");
+  grid.innerHTML = "";
+  for (const [id, d] of Object.entries(state)) {
+    const batt = d.battery != null ? d.battery.toFixed(0) : null;
+    const bc = batteryColor(d.battery);
+    const status = d.status || "OFFLINE";
+    const extra = d.extra || {};
+    let rows = "";
+    if (batt != null) {
+      rows += `<div class="metric"><span>Battery</span><span class="metric-val" style="color:${bc}">${batt}%</span></div>
+               <div class="battery-bar"><div class="battery-fill" style="width:${batt}%;background:${bc}"></div></div>`;
+    }
+    if (extra.speed !== undefined) rows += `<div class="metric"><span>Speed</span><span class="metric-val">${extra.speed} m/s</span></div>`;
+    if (extra.rssi !== undefined) rows += `<div class="metric"><span>RSSI</span><span class="metric-val">${extra.rssi} dBm</span></div>`;
+    if (extra.depth !== undefined) rows += `<div class="metric"><span>Depth</span><span class="metric-val">${extra.depth} m</span></div>`;
+    if (extra.spindle_rpm !== undefined) rows += `<div class="metric"><span>Spindle RPM</span><span class="metric-val">${extra.spindle_rpm}</span></div>`;
+    if (extra.task_state !== undefined) rows += `<div class="metric"><span>Task</span><span class="metric-val">${extra.task_state}</span></div>`;
+    if (extra.leak_detected) rows += `<div class="metric"><span>LEAK</span><span class="metric-val" style="color:#f85149">DETECTED</span></div>`;
+    const imu = d.imu;
+    if (imu) rows += `<div class="metric"><span>Roll/Pitch</span><span class="metric-val">${(imu.roll||0).toFixed(1)}° / ${(imu.pitch||0).toFixed(1)}°</span></div>`;
+    rows += `<div class="metric"><span style="color:#8b949e;font-size:.75rem">${new Date((d.timestamp||0)*1000).toLocaleTimeString()}</span></div>`;
+    grid.innerHTML += `<div class="card">
+      <div class="card-header">
+        <span class="card-title">${id}</span>
+        <span class="badge badge-${status}">${status}</span>
+      </div>${rows}</div>`;
+  }
+}
+
+function updateChart(ts) {
+  const label = new Date(ts*1000).toLocaleTimeString();
+  chart.data.labels.push(label);
+  if (chart.data.labels.length > 30) chart.data.labels.shift();
+  DEVICES.forEach((d,i) => {
+    const v = state[d]?.battery ?? null;
+    chart.data.datasets[i].data.push(v);
+    if (chart.data.datasets[i].data.length > 30) chart.data.datasets[i].data.shift();
+  });
+  chart.update();
+}
+
+function addLog(pkt) {
+  const tr = `<tr>
+    <td>${new Date((pkt.timestamp||0)*1000).toLocaleTimeString()}</td>
+    <td>${pkt.device}</td>
+    <td><span class="badge badge-${pkt.status}">${pkt.status}</span></td>
+    <td>${pkt.battery != null ? pkt.battery.toFixed(0)+"%" : "—"}</td>
+    <td style="color:#8b949e">${pkt.device_type}</td>
+  </tr>`;
+  logRows.unshift(tr);
+  if (logRows.length > 50) logRows.pop();
+  document.getElementById("log-body").innerHTML = logRows.join("");
+}
+
+function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws/telemetry`);
+  ws.onopen = () => {
+    document.getElementById("ws-dot").style.background = "#3fb950";
+    document.getElementById("conn-status").textContent = "Connected";
+  };
+  ws.onclose = () => {
+    document.getElementById("ws-dot").style.background = "#f85149";
+    document.getElementById("conn-status").textContent = "Reconnecting...";
+    setTimeout(connect, 3000);
+  };
+  ws.onmessage = (e) => {
+    const pkt = JSON.parse(e.data);
+    state[pkt.device] = pkt;
+    renderCards();
+    updateChart(pkt.timestamp);
+    addLog(pkt);
+  };
+}
+connect();
+</script>
+</body>
+</html>
