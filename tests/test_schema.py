@@ -1,6 +1,9 @@
+"""Tests for TelemetryPacket serialization and deserialization."""
+
 import json
 import time
 import pytest
+
 from telemetry_hub.schema import (
     TelemetryPacket,
     IMUData,
@@ -10,90 +13,167 @@ from telemetry_hub.schema import (
 )
 
 
-def _make_packet(**kwargs) -> TelemetryPacket:
-    defaults = dict(
-        device="test-001",
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def make_full_packet() -> TelemetryPacket:
+    return TelemetryPacket(
+        device="GT3-001",
         device_type=DeviceType.GT3_DRONE.value,
-        battery=85.0,
+        timestamp=1_700_000_000.0,
+        battery=87.3,
         status=DeviceStatus.RUNNING.value,
+        imu=IMUData(roll=1.1, pitch=2.2, yaw=90.0, ax=0.01, ay=0.02, az=9.81),
+        gps=GPSData(lat=37.5665, lon=126.9780, alt=50.0, fix=True),
+        extra={"speed": 12.5, "rssi": -65},
     )
-    defaults.update(kwargs)
-    return TelemetryPacket(**defaults)
 
 
-class TestTelemetryPacketBasic:
-    def test_default_timestamp(self) -> None:
-        before = time.time()
-        pkt = _make_packet()
-        after = time.time()
-        assert before <= pkt.timestamp <= after
+# ---------------------------------------------------------------------------
+# Serialisation
+# ---------------------------------------------------------------------------
 
-    def test_fields(self) -> None:
-        pkt = _make_packet(battery=72.5)
-        assert pkt.device == "test-001"
-        assert pkt.battery == 72.5
-        assert pkt.status == DeviceStatus.RUNNING.value
+class TestTelemetryPacketToJson:
+    def test_returns_valid_json_string(self) -> None:
+        packet = make_full_packet()
+        result = packet.to_json()
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert isinstance(parsed, dict)
 
-    def test_extra_default_empty(self) -> None:
-        pkt = _make_packet()
-        assert pkt.extra == {}
+    def test_device_field_preserved(self) -> None:
+        packet = make_full_packet()
+        parsed = json.loads(packet.to_json())
+        assert parsed["device"] == "GT3-001"
+
+    def test_device_type_field_preserved(self) -> None:
+        packet = make_full_packet()
+        parsed = json.loads(packet.to_json())
+        assert parsed["device_type"] == DeviceType.GT3_DRONE.value
+
+    def test_battery_field_preserved(self) -> None:
+        packet = make_full_packet()
+        parsed = json.loads(packet.to_json())
+        assert abs(parsed["battery"] - 87.3) < 1e-6
+
+    def test_status_field_preserved(self) -> None:
+        packet = make_full_packet()
+        parsed = json.loads(packet.to_json())
+        assert parsed["status"] == DeviceStatus.RUNNING.value
+
+    def test_imu_nested_dict_present(self) -> None:
+        packet = make_full_packet()
+        parsed = json.loads(packet.to_json())
+        assert "imu" in parsed
+        assert parsed["imu"]["roll"] == pytest.approx(1.1)
+        assert parsed["imu"]["az"] == pytest.approx(9.81)
+
+    def test_gps_nested_dict_present(self) -> None:
+        packet = make_full_packet()
+        parsed = json.loads(packet.to_json())
+        assert "gps" in parsed
+        assert parsed["gps"]["lat"] == pytest.approx(37.5665)
+        assert parsed["gps"]["fix"] is True
+
+    def test_extra_dict_preserved(self) -> None:
+        packet = make_full_packet()
+        parsed = json.loads(packet.to_json())
+        assert parsed["extra"]["speed"] == pytest.approx(12.5)
+        assert parsed["extra"]["rssi"] == -65
+
+    def test_null_imu_serialises_as_none(self) -> None:
+        packet = TelemetryPacket(device="CNC-001", device_type="CNC")
+        parsed = json.loads(packet.to_json())
+        assert parsed["imu"] is None
+
+    def test_null_gps_serialises_as_none(self) -> None:
+        packet = TelemetryPacket(device="CNC-001", device_type="CNC")
+        parsed = json.loads(packet.to_json())
+        assert parsed["gps"] is None
 
 
-class TestTelemetryPacketSerialization:
-    def test_to_json_is_valid_json(self) -> None:
-        pkt = _make_packet()
-        raw = pkt.to_json()
-        parsed = json.loads(raw)
-        assert parsed["device"] == "test-001"
+# ---------------------------------------------------------------------------
+# Deserialisation
+# ---------------------------------------------------------------------------
 
-    def test_roundtrip_no_imu_gps(self) -> None:
-        pkt = _make_packet(battery=50.0)
-        restored = TelemetryPacket.from_json(pkt.to_json())
-        assert restored.device == pkt.device
-        assert restored.battery == pkt.battery
-        assert restored.imu is None
-        assert restored.gps is None
+class TestTelemetryPacketFromJson:
+    def test_roundtrip_minimal(self) -> None:
+        original = TelemetryPacket(device="ARM-001", device_type="RobotArm")
+        restored = TelemetryPacket.from_json(original.to_json())
+        assert restored.device == original.device
+        assert restored.device_type == original.device_type
 
-    def test_roundtrip_with_imu(self) -> None:
-        imu = IMUData(roll=1.5, pitch=-2.3, yaw=90.0, ax=0.1, ay=0.2, az=9.8)
-        pkt = _make_packet(imu=imu)
-        restored = TelemetryPacket.from_json(pkt.to_json())
-        assert restored.imu is not None
-        assert restored.imu.roll == pytest.approx(1.5)
-        assert restored.imu.yaw == pytest.approx(90.0)
+    def test_roundtrip_full_packet(self) -> None:
+        original = make_full_packet()
+        restored = TelemetryPacket.from_json(original.to_json())
+        assert restored.device == original.device
+        assert restored.battery == pytest.approx(original.battery)
+        assert restored.status == original.status
 
-    def test_roundtrip_with_gps(self) -> None:
-        gps = GPSData(lat=37.5665, lon=126.9780, alt=50.0, fix=True)
-        pkt = _make_packet(gps=gps)
-        restored = TelemetryPacket.from_json(pkt.to_json())
-        assert restored.gps is not None
-        assert restored.gps.lat == pytest.approx(37.5665)
+    def test_imu_restored_as_imudata(self) -> None:
+        original = make_full_packet()
+        restored = TelemetryPacket.from_json(original.to_json())
+        assert isinstance(restored.imu, IMUData)
+        assert restored.imu.roll == pytest.approx(original.imu.roll)
+        assert restored.imu.az == pytest.approx(original.imu.az)
+
+    def test_gps_restored_as_gpsdata(self) -> None:
+        original = make_full_packet()
+        restored = TelemetryPacket.from_json(original.to_json())
+        assert isinstance(restored.gps, GPSData)
+        assert restored.gps.lat == pytest.approx(original.gps.lat)
         assert restored.gps.fix is True
 
-    def test_roundtrip_with_extra(self) -> None:
-        pkt = _make_packet(extra={"speed": 3.5, "motor_pwm": [1500, 1520, 1480, 1510]})
-        restored = TelemetryPacket.from_json(pkt.to_json())
-        assert restored.extra["speed"] == pytest.approx(3.5)
-        assert len(restored.extra["motor_pwm"]) == 4
+    def test_extra_dict_roundtrip(self) -> None:
+        original = make_full_packet()
+        restored = TelemetryPacket.from_json(original.to_json())
+        assert restored.extra["rssi"] == original.extra["rssi"]
 
-    def test_roundtrip_full(self) -> None:
-        pkt = _make_packet(
-            imu=IMUData(roll=2.0, pitch=-1.0, yaw=45.0),
-            gps=GPSData(lat=37.0, lon=127.0, alt=100.0, fix=True),
-            extra={"rssi": -65},
-        )
-        restored = TelemetryPacket.from_json(pkt.to_json())
-        assert restored.imu.yaw == pytest.approx(45.0)
-        assert restored.gps.fix is True
-        assert restored.extra["rssi"] == -65
+    def test_from_json_with_no_imu_gps(self) -> None:
+        raw = json.dumps({
+            "device": "SUB-001",
+            "device_type": "Submarine",
+            "timestamp": time.time(),
+            "battery": 45.0,
+            "status": "RUNNING",
+            "imu": None,
+            "gps": None,
+            "extra": {"depth": 1.5},
+        })
+        packet = TelemetryPacket.from_json(raw)
+        assert packet.device == "SUB-001"
+        assert packet.imu is None
+        assert packet.gps is None
+        assert packet.extra["depth"] == pytest.approx(1.5)
+
+    def test_timestamp_preserved(self) -> None:
+        ts = 1_700_000_001.123
+        packet = TelemetryPacket(device="X", device_type="GT3", timestamp=ts)
+        restored = TelemetryPacket.from_json(packet.to_json())
+        assert restored.timestamp == pytest.approx(ts)
 
 
-class TestDeviceTypeEnum:
-    def test_all_values_unique(self) -> None:
-        values = [dt.value for dt in DeviceType]
-        assert len(values) == len(set(values))
+# ---------------------------------------------------------------------------
+# IMUData / GPSData standalone
+# ---------------------------------------------------------------------------
 
-    def test_expected_members(self) -> None:
-        names = {dt.name for dt in DeviceType}
-        assert "GT3_DRONE" in names
-        assert "SUBMARINE" in names
+class TestIMUData:
+    def test_defaults(self) -> None:
+        imu = IMUData()
+        assert imu.roll == 0.0
+        assert imu.az == 0.0
+
+    def test_custom_values(self) -> None:
+        imu = IMUData(roll=10.0, pitch=-5.0, yaw=180.0, ax=0.1, ay=0.2, az=9.8)
+        assert imu.yaw == pytest.approx(180.0)
+
+
+class TestGPSData:
+    def test_defaults(self) -> None:
+        gps = GPSData()
+        assert gps.fix is False
+
+    def test_fix_true(self) -> None:
+        gps = GPSData(lat=37.0, lon=127.0, alt=100.0, fix=True)
+        assert gps.fix is True
