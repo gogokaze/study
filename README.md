@@ -1,3 +1,58 @@
+# YFL Mission Planner MK.5
+
+## MK.5 Architecture Upgrade
+
+MK.5 introduces a multi-agent, shared-world-model architecture on top of the original telemetry pipeline.
+
+### New Components
+
+| Module | Purpose |
+|---|---|
+| `world_model/` | `SharedWorldModel` — asyncio-safe object registry with upsert, query, assign, update_state |
+| `world_model/events.py` | `EventBus` with typed `RoboticsEvent`, fan-out publish/subscribe, 500-event history |
+| `agents/` | `BaseAgent` + 5 specializations: Scout, Transport, Manipulator, Inspection, Submarine |
+| `behavior_tree/nodes.py` | `SequenceNode`, `SelectorNode`, `ConditionNode`, `ActionNode`, `InverterNode` |
+| `behavior_tree/global_bt.py` | `GlobalBehaviorTree` — warehouse QR-pickup mission BT |
+| `behavior_tree/local_bt.py` | `LocalBehaviorTree` — per-agent perceive→decide→act loop |
+| `web_dashboard/mk5_routes.py` | FastAPI router: `GET /api/mk5/world`, `/events`, `/agents` |
+| `mk5_main.py` | Entry point: wires all agents, devices, and BTs; runs 10 ticks |
+
+### MK.5 Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  GlobalBehaviorTree (MK.5)                  │
+│  Sequence: ScoutSearch → QRHandling → PickupPath            │
+└────────────────────────┬────────────────────────────────────┘
+                         │ tick()
+     ┌───────────────────┼───────────────────┐
+     ▼                   ▼                   ▼
+ ScoutAgent        TransportAgent     ManipulatorAgent
+ (LocalBT)         (LocalBT)          (LocalBT)
+     │                   │                   │
+     └───────────────────┴───────────────────┘
+                         │
+              SharedWorldModel (asyncio.Lock)
+              WorldObject: QR_CODE / ROBOT / ITEM ...
+                         │
+                    EventBus
+              RoboticsEvent fan-out (500-event deque)
+```
+
+### Running MK.5
+
+```bash
+python mk5_main.py
+```
+
+### Tests
+
+```bash
+python -m pytest tests/test_mk5.py -v
+```
+
+---
+
 # YFL Robotics Unified Architecture
 
 A unified telemetry, monitoring, and mission-planning platform for heterogeneous robotic devices developed by YFL Robotics. This architecture provides a single control plane for drones, quadrupeds, robotic arms, CNC machines, and aquatic vehicles.
