@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>메인보드 수리 레퍼런스 카드</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+
+  /* Tabs */
+  .tabs { display: flex; border-bottom: 1px solid #30363d; background: #161b22; }
+  .tab-btn {
+    padding: 12px 24px; cursor: pointer; border: none; background: none;
+    color: #8b949e; font-family: inherit; font-size: 14px; border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: #c9d1d9; }
+  .tab-btn.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+
+  .tab-panel { display: none; padding: 24px; max-width: 860px; margin: 0 auto; }
+  .tab-panel.active { display: block; }
+
+  h2 { font-size: 16px; color: #58a6ff; margin-bottom: 16px; letter-spacing: 0.5px; }
+  h3 { font-size: 13px; color: #8b949e; margin: 20px 0 10px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Rail table */
+  .rail-row { margin-bottom: 14px; }
+  .rail-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .rail-name { color: #e6edf3; }
+  .rail-vals { color: #8b949e; font-size: 12px; }
+  .bar-bg { background: #21262d; border-radius: 3px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .status-ok   { background: #3fb950; }
+  .status-warn { background: #d29922; }
+  .status-bad  { background: #f85149; }
+
+  .rail-note { font-size: 11px; color: #6e7681; margin-top: 3px; }
+
+  /* SMD Calculator */
+  .calc-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .input-row { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .smd-input {
+    flex: 1; min-width: 160px; padding: 10px 14px;
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    color: #e6edf3; font-family: inherit; font-size: 18px; letter-spacing: 2px;
+    text-align: center; outline: none; transition: border-color 0.2s;
+  }
+  .smd-input:focus { border-color: #58a6ff; }
+  .result-box { background: #0d1117; border-radius: 6px; padding: 16px; text-align: center; }
+  .result-val { font-size: 28px; color: #3fb950; font-weight: bold; }
+  .result-unit { font-size: 14px; color: #8b949e; margin-left: 4px; }
+  .result-detail { font-size: 12px; color: #6e7681; margin-top: 6px; }
+  .result-error { font-size: 16px; color: #f85149; }
+
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .ex-chip {
+    padding: 6px 12px; background: #21262d; border: 1px solid #30363d;
+    border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.2s;
+    color: #8b949e;
+  }
+  .ex-chip:hover { background: #30363d; color: #58a6ff; border-color: #58a6ff; }
+
+  .format-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+  .format-table th { color: #8b949e; padding: 6px 10px; border-bottom: 1px solid #21262d; text-align: left; }
+  .format-table td { padding: 6px 10px; border-bottom: 1px solid #161b22; color: #c9d1d9; }
+  .format-table tr:hover td { background: #161b22; }
+  code { background: #21262d; padding: 2px 6px; border-radius: 3px; color: #79c0ff; }
+
+  /* Checklist tab */
+  .warn-card { background: #161b22; border-left: 3px solid #d29922; border-radius: 0 6px 6px 0; padding: 14px 16px; margin-bottom: 12px; }
+  .warn-card.danger { border-left-color: #f85149; }
+  .warn-card.ok { border-left-color: #3fb950; }
+  .warn-title { font-size: 13px; color: #e6edf3; margin-bottom: 6px; }
+  .warn-body { font-size: 12px; color: #8b949e; line-height: 1.7; }
+  .warn-body b { color: #d29922; }
+  .warn-card.danger .warn-body b { color: #f85149; }
+  .warn-card.ok .warn-body b { color: #3fb950; }
+
+  .checklist { list-style: none; }
+  .checklist li { padding: 8px 0; border-bottom: 1px solid #21262d; font-size: 13px; display: flex; align-items: flex-start; gap: 10px; }
+  .checklist li:last-child { border-bottom: none; }
+  .check-icon { font-size: 16px; flex-shrink: 0; cursor: pointer; }
+  .checklist li.checked .check-text { color: #6e7681; text-decoration: line-through; }
+
+  .formula-box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 14px 16px; font-size: 13px; margin-bottom: 12px; }
+  .formula-box .f { color: #79c0ff; font-size: 15px; margin: 6px 0; }
+  .formula-box .f-note { color: #6e7681; font-size: 11px; }
+
+  /* 1V injector */
+  .inject-calc { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 18px; margin-bottom: 20px; }
+  .inject-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .inject-field { flex: 1; min-width: 120px; }
+  .inject-field label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+  .inject-field input {
+    width: 100%; padding: 8px 10px; background: #0d1117; border: 1px solid #30363d;
+    border-radius: 5px; color: #e6edf3; font-family: inherit; font-size: 14px; outline: none;
+  }
+  .inject-field input:focus { border-color: #58a6ff; }
+  .inject-result { background: #0d1117; border-radius: 6px; padding: 12px 16px; font-size: 13px; }
+  .inject-result .ir { color: #3fb950; font-size: 16px; font-weight: bold; }
+  .inject-result .ip { color: #d29922; font-size: 16px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('rail')">전원 레일 &amp; 칩셋</button>
+  <button class="tab-btn" onclick="switchTab('smd')">SMD 코드 계산기</button>
+  <button class="tab-btn" onclick="switchTab('tips')">측정 주의사항</button>
+</div>
+
+<!-- TAB 1: 전원 레일 -->
+<div id="tab-rail" class="tab-panel active">
+  <h2>정상 저항값 가이드 (GND 기준 멀티미터 측정)</h2>
+  <p style="font-size:12px;color:#6e7681;margin-bottom:20px;">보드 전원 OFF 상태. 멀티미터 저항 모드. 양/음 리드 모두 측정 후 낮은 값 기준.</p>
+
+  <h3>CPU / 메모리 레일</h3>
+  <div id="rail-list"></div>
+
+  <h3>1V 주입 시 단락 저항 추정기</h3>
+  <div class="inject-calc">
+    <div class="inject-row">
+      <div class="inject-field">
+        <label>주입 전압 (V)</label>
+        <input type="number" id="inj-v" value="1.0" step="0.1" oninput="calcInject()">
+      </div>
+      <div class="inject-field">
+        <label>측정 전류 (mA)</label>
+        <input type="number" id="inj-i" value="500" step="10" oninput="calcInject()">
+      </div>
+      <div class="inject-field">
+        <label>전류제한 설정 (mA)</label>
+        <input type="number" id="inj-lim" value="1000" step="100" oninput="calcInject()">
+      </div>
+    </div>
+    <div class="inject-result" id="inject-result"></div>
+  </div>
+</div>
+
+<!-- TAB 2: SMD 계산기 -->
+<div id="tab-smd" class="tab-panel">
+  <h2>SMD 저항 코드 계산기</h2>
+  <div class="calc-box">
+    <div class="input-row">
+      <input class="smd-input" id="smd-code" type="text" placeholder="예: 1001" maxlength="6" oninput="calcSMD()">
+      <div class="result-box" style="flex:1;min-width:180px;" id="smd-result">
+        <div style="color:#6e7681;font-size:13px;">코드를 입력하세요</div>
+      </div>
+    </div>
+    <div class="examples">
+      <span style="font-size:12px;color:#6e7681;align-self:center;">예제:</span>
+    </div>
+  </div>
+
+  <table class="format-table">
+    <thead>
+      <tr><th>형식</th><th>예시</th><th>결과</th><th>설명</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>3자리 숫자</td><td><code>103</code></td><td>10 kΩ</td><td>앞 2자리 × 10^뒷자리</td></tr>
+      <tr><td>4자리 숫자</td><td><code>1001</code></td><td>1 kΩ</td><td>앞 3자리 × 10^뒷자리</td></tr>
+      <tr><td>R 포함</td><td><code>4R7</code></td><td>4.7 Ω</td><td>R = 소수점</td></tr>
+      <tr><td>K 포함</td><td><code>4K7</code></td><td>4.7 kΩ</td><td>K = ×1000</td></tr>
+      <tr><td>M 포함</td><td><code>2M2</code></td><td>2.2 MΩ</td><td>M = ×1000000</td></tr>
+      <tr><td>EIA-96</td><td><code>01A</code></td><td>100 Ω</td><td>정밀 1% SMD (01~96)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TAB 3: 측정 주의사항 -->
+<div id="tab-tips" class="tab-panel">
+  <h2>측정 전 체크리스트</h2>
+  <ul class="checklist" id="checklist">
+    <li><span class="check-icon" onclick="toggleCheck(this)">☐</span><span class="check-text">보드 전원 완전 차단 (ATX 메인 커넥터 분리)</span></li>
+    <li><span class="check-icon" onclick="toggleCheck(this)">☐</span><span class="check-text">대형 캐패시터 방전 대기 (30초)</span></li>
+    <li><span class="check-icon" onclick="toggleCheck(this)">☐</span><span class="check-text">멀티미터 배터리 잔량 확인 (전압 오차 원인)</span></li>
+    <li><span class="check-icon" onclick="toggleCheck(this)">☐</span><span class="check-text">리드 저항 보정 — 두 프로브 단락 후 0Ω 확인</span></li>
+    <li><span class="check-icon" onclick="toggleCheck(this)">☐</span><span class="check-text">1V 주입 시 전류제한 먼저 설정 후 전압 인가</span></li>
+    <li><span class="check-icon" onclick="toggleCheck(this)">☐</span><span class="check-text">측정 중 손가락이 패드에 닿지 않게 주의 (인체 저항 혼입)</span></li>
+  </ul>
+
+  <h3 style="margin-top:24px;">주요 오류 패턴</h3>
+
+  <div class="warn-card danger">
+    <div class="warn-title">인체 저항 혼입</div>
+    <div class="warn-body">
+      손가락으로 프로브를 잡으면 <b>피부 저항(10kΩ~1MΩ)</b>이 병렬로 연결됨.<br>
+      낮은 저항 측정 시 실제보다 높게, 높은 저항 측정 시 낮게 읽힘.<br>
+      → 프로브 끝만 패드에 접촉, 절연 장갑 권장.
+    </div>
+  </div>
+
+  <div class="warn-card">
+    <div class="warn-title">아날로그 미터 Zero Adjust</div>
+    <div class="warn-body">
+      아날로그 미터는 저항 모드 전환 시마다 <b>두 리드 단락 → 0Ω 조정</b> 필수.<br>
+      배터리 소모에 따라 기준점이 변함. 레인지 변경마다 재조정.
+    </div>
+  </div>
+
+  <div class="warn-card ok">
+    <div class="warn-title">다이오드 모드 vs 저항 모드</div>
+    <div class="warn-body">
+      <b>저항 모드</b>: 정확한 수치, 단 전류가 낮아 정션 전압 미도달 → 반도체 판별 부정확<br>
+      <b>다이오드 모드</b>: 순방향 0.4~0.7V = 정상 PN, 0V = 단락, OL = 개방<br>
+      SMD 다이오드·MOSFET Body 다이오드 판별은 <b>다이오드 모드</b> 사용.
+    </div>
+  </div>
+
+  <h3 style="margin-top:24px;">트랙 저항 공식</h3>
+  <div class="formula-box">
+    <div class="f">R = ρ · L / (W · T)</div>
+    <div class="f-note">ρ = 1.72×10⁻⁸ Ω·m (구리) | T: 1oz=35μm, 2oz=70μm</div>
+    <div style="margin-top:12px;font-size:12px;color:#8b949e;">
+      발열: <span style="color:#79c0ff;">P = I² · R</span> &nbsp;|&nbsp;
+      최대 전류: <span style="color:#79c0ff;">I_max = k · W · T^0.44</span> (IPC-2221)
+    </div>
+  </div>
+
+  <div class="formula-box">
+    <div style="font-size:11px;color:#6e7681;margin-bottom:6px;">PMIC 피드백 전압 (Buck 컨버터)</div>
+    <div class="f">V_out = V_ref · (1 + R1/R2)</div>
+    <div class="f-note">V_ref: 데이터시트 확인 (보통 0.6~0.8V) | R1: 상단, R2: 하단</div>
+  </div>
+</div>
+
+<script>
+// ─── Rail data ───────────────────────────────────────────────
+const rails = [
+  { name: 'CPU VCore (1.0V 레일)', comp: 'CPU 소켓 VCC', ok: [2, 10], warn: [0.5, 2], note: '2Ω 미만 → MOSFET 단락 의심', maxBar: 50 },
+  { name: 'VDDQ / DDR 터미네이션 (1.1V)', comp: 'DDR 슬롯 VDD', ok: [3, 20], warn: [1, 3], note: 'DDR5는 1.1V, DDR4는 1.2V', maxBar: 50 },
+  { name: 'PCH / 칩셋 IO (1.8V)', comp: 'PCH 주변', ok: [10, 50], warn: [3, 10], note: '10Ω 미만 → PCH 내부 단락', maxBar: 100 },
+  { name: '3.3V 스탠바이 (VSB)', comp: 'SB 필터 커패시터', ok: [20, 100], warn: [5, 20], note: 'ATX 연결 전에도 PSU에서 공급', maxBar: 200 },
+  { name: '5V USB (VBUS)', comp: 'USB 포트 VBUS', ok: [15, 80], warn: [3, 15], note: '3Ω 미만 → USB 장치 내부 단락', maxBar: 200 },
+  { name: 'PCIe 슬롯 (3.3V / 12V)', comp: 'PCIe A1/B3', ok: [10, 60], warn: [2, 10], note: '2Ω 미만 → GPU 내부 단락', maxBar: 150 },
+];
+
+function resistanceColor(val, rail) {
+  if (val < rail.warn[0]) return 'status-bad';
+  if (val < rail.ok[0])   return 'status-warn';
+  if (val <= rail.ok[1])  return 'status-ok';
+  return 'status-warn';
+}
+
+function buildRails() {
+  const el = document.getElementById('rail-list');
+  el.innerHTML = rails.map(r => {
+    const midOk = (r.ok[0] + r.ok[1]) / 2;
+    const pct = Math.min(100, (midOk / r.maxBar) * 100);
+    const cls = 'status-ok';
+    return `
+      <div class="rail-row">
+        <div class="rail-label">
+          <span class="rail-name">${r.name}</span>
+          <span class="rail-vals">정상: ${r.ok[0]}~${r.ok[1]} Ω &nbsp;|&nbsp; 경고: ${r.warn[0]}~${r.warn[1]} Ω</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar-fill ${cls}" style="width:${pct}%"></div>
+        </div>
+        <div class="rail-note">${r.comp} &nbsp;·&nbsp; ${r.note}</div>
+      </div>`;
+  }).join('');
+}
+
+// ─── 1V 주입 계산 ────────────────────────────────────────────
+function calcInject() {
+  const v = parseFloat(document.getElementById('inj-v').value) || 1;
+  const i = parseFloat(document.getElementById('inj-i').value) || 0;
+  const lim = parseFloat(document.getElementById('inj-lim').value) || 1000;
+  const el = document.getElementById('inject-result');
+  if (i <= 0) { el.innerHTML = '<span style="color:#6e7681">전류값을 입력하세요</span>'; return; }
+  const r = (v / (i / 1000)).toFixed(2);
+  const p = (v * (i / 1000)).toFixed(3);
+  const atLim = i >= lim * 0.95;
+  el.innerHTML = `
+    단락 저항 추정: <span class="ir">${r} Ω</span>&nbsp;&nbsp;
+    발열: <span class="ip">${p} W</span>
+    ${atLim ? '<br><span style="color:#f85149;font-size:12px;">⚠ 전류제한 도달 — 실제 저항은 더 낮을 수 있음</span>' : ''}
+    <br><span style="font-size:11px;color:#6e7681">P=V·I 기준. 부품 위치: 열화상 카메라 또는 손가락으로 탐지.</span>
+  `;
+}
+
+// ─── SMD 계산기 ──────────────────────────────────────────────
+const EIA96 = [
+  100,102,105,107,110,113,115,118,121,124,127,130,133,137,140,143,147,150,
+  154,158,162,165,169,174,178,182,187,191,196,200,205,210,215,221,226,232,
+  237,243,249,255,261,267,274,280,287,294,301,309,316,324,332,340,348,357,
+  365,374,383,392,402,412,422,432,442,453,464,475,487,499,511,523,536,549,
+  562,576,590,604,619,634,649,665,681,698,715,732,750,768,787,806,825,845,
+  866,887,909,931,953,976
+];
+const EIA96_MULT = { Z:0.001,Y:0.01,X:0.1,A:1,B:10,C:100,D:1000,E:10000,F:100000 };
+
+function calcSMD() {
+  const raw = document.getElementById('smd-code').value.trim().toUpperCase();
+  const el = document.getElementById('smd-result');
+  if (!raw) { el.innerHTML = '<div style="color:#6e7681;font-size:13px;">코드를 입력하세요</div>'; return; }
+
+  let val = null, detail = '';
+
+  // R/K/M 형식
+  if (/[RKM]/.test(raw)) {
+    let mult = raw.includes('K') ? 1000 : raw.includes('M') ? 1e6 : 1;
+    let clean = raw.replace('R','.');
+    if (raw.includes('K')) clean = raw.replace('K','.');
+    if (raw.includes('M')) clean = raw.replace('M','.');
+    val = parseFloat(clean) * (raw.includes('R') ? 1 : mult);
+    detail = `${raw} 형식`;
+  }
+  // EIA-96 (2자리 숫자 + 문자)
+  else if (/^\d{2}[A-F]$/.test(raw)) {
+    const idx = parseInt(raw.slice(0,2)) - 1;
+    const mult = EIA96_MULT[raw[2]] || 1;
+    if (idx >= 0 && idx < 96) { val = EIA96[idx] * mult; detail = `EIA-96 정밀 코드`; }
+  }
+  // 4자리 숫자
+  else if (/^\d{4}$/.test(raw)) {
+    val = parseInt(raw.slice(0,3)) * Math.pow(10, parseInt(raw[3]));
+    detail = `4자리: ${raw.slice(0,3)} × 10^${raw[3]}`;
+  }
+  // 3자리 숫자
+  else if (/^\d{3}$/.test(raw)) {
+    val = parseInt(raw.slice(0,2)) * Math.pow(10, parseInt(raw[2]));
+    detail = `3자리: ${raw.slice(0,2)} × 10^${raw[2]}`;
+  }
+
+  if (val === null || isNaN(val)) {
+    el.innerHTML = '<div class="result-error">인식 불가 — 형식 표 참고</div>'; return;
+  }
+
+  let disp, unit;
+  if (val < 1000)      { disp = val % 1 === 0 ? val : val.toFixed(1); unit = 'Ω'; }
+  else if (val < 1e6)  { disp = (val/1000) % 1 === 0 ? val/1000 : (val/1000).toFixed(2); unit = 'kΩ'; }
+  else                 { disp = (val/1e6)  % 1 === 0 ? val/1e6  : (val/1e6).toFixed(2);  unit = 'MΩ'; }
+
+  el.innerHTML = `<span class="result-val">${disp}</span><span class="result-unit">${unit}</span><div class="result-detail">${detail} (${val.toLocaleString()} Ω)</div>`;
+}
+
+// ─── 체크리스트 ──────────────────────────────────────────────
+function toggleCheck(icon) {
+  const li = icon.parentElement;
+  li.classList.toggle('checked');
+  icon.textContent = li.classList.contains('checked') ? '☑' : '☐';
+}
+
+// ─── 탭 전환 ─────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    const names = ['rail','smd','tips'];
+    b.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ─── 예제 칩 생성 ─────────────────────────────────────────────
+const examples = ['103','1001','4R7','4K7','2M2','334','01A','472','560'];
+const exRow = document.querySelector('.examples');
+examples.forEach(e => {
+  const chip = document.createElement('span');
+  chip.className = 'ex-chip';
+  chip.textContent = e;
+  chip.onclick = () => {
+    document.getElementById('smd-code').value = e;
+    calcSMD();
+  };
+  exRow.appendChild(chip);
+});
+
+// ─── Init ────────────────────────────────────────────────────
+buildRails();
+calcInject();
+</script>
+</body>
+</html>
