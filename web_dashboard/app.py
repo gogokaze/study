@@ -18,6 +18,7 @@ from devices.robot_arm import RobotArm
 from devices.cnc_machine import CNCMachine
 from devices.submarine import LegoSubmarine
 from web_dashboard.ws_handler import WebSocketManager
+from web_dashboard.pcb_routes import router as pcb_router
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="YFL Robotics Dashboard", version="1.0.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.include_router(pcb_router)
 
 hub = TelemetryHub(db_path=DB_PATH)
 ws_manager = WebSocketManager()
@@ -74,6 +76,12 @@ async def _simulate_loop() -> None:
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
     html_path = STATIC_DIR / "dashboard.html"
+    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/pcb", response_class=HTMLResponse)
+async def pcb_editor() -> HTMLResponse:
+    html_path = STATIC_DIR / "pcb_editor.html"
     return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
 
 

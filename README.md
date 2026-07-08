@@ -1,3 +1,39 @@
+# GoJokaze MK.1 — Web PCB Design
+
+A web-based ECAD workspace for laying out the GoJokaze MK.1 flight-controller
+PCB (STM32F427, 36x36mm, 4-layer). Lives alongside the YFL telemetry stack
+below, served from the same FastAPI app.
+
+### Module Layout
+
+| Module | Purpose |
+|---|---|
+| `pcb_design/board.py` | `BoardSpec` — 36x36mm outline, M3x4 mount holes on a 30.5mm pattern |
+| `pcb_design/stackup.py` | 4-layer stackup: L1 TOP (signal) / L2 GND (plane) / L3 POWER (plane) / L4 BOTTOM (signal) |
+| `pcb_design/net_classes.py` | Trace-width classes for SPI/I2C/UART/PWM/3V3/VBAT nets |
+| `pcb_design/design_rules.py` | Manufacturing DRC (trace/spacing/via/thickness/finish) + sensor isolation keep-away rules |
+| `pcb_design/components.py` | Footprint/pad model + default MK.1 placement (MCU, IMU, MAG, buck regulator, connectors) |
+| `pcb_design/drc.py` | DRC engine: board-outline, courtyard-overlap, IMU/MAG-to-regulator isolation, net-class width checks |
+| `pcb_design/ratsnest.py` | Nearest-neighbor airwire generation per net for visualization |
+| `web_dashboard/pcb_routes.py` | FastAPI router: `GET /api/pcb/{board,stackup,netclasses,design-rules,components,ratsnest,drc}`, `PUT /api/pcb/components/{ref}/position`, `POST /api/pcb/components/reset` |
+| `web_dashboard/static/pcb_editor.html` | Canvas-based 2D layout editor: drag-to-place footprints, layer toggles, ratsnest/courtyard/IMU-keepout overlays, live DRC panel |
+
+### Running
+
+```bash
+uvicorn web_dashboard.app:app --host 0.0.0.0 --port 8080 --reload
+```
+
+Then open `http://localhost:8080/pcb`.
+
+### Tests
+
+```bash
+python -m pytest tests/test_pcb_design.py -v
+```
+
+---
+
 # YFL Mission Planner MK.5
 
 ## MK.5 Architecture Upgrade
